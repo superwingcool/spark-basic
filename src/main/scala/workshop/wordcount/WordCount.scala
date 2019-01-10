@@ -4,7 +4,7 @@ import java.time.Clock
 
 import com.typesafe.config.ConfigFactory
 import org.apache.log4j.{Level, LogManager, Logger}
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 
 object WordCount {
@@ -16,32 +16,38 @@ object WordCount {
     log.setLevel(Level.INFO)
 
     val spark = SparkSession.builder.appName("Spark Word Count").getOrCreate()
+    //    val spark = SparkSession.builder()
+    //      .appName("Spark Word Count")
+    //      .master("local[2]")
+    //      .getOrCreate();
     log.info("Application Initialized: " + spark.sparkContext.appName)
 
+    val filePath = args(0);
 
-    run(spark)
+    val outputPath = args(1);
+
+    run(spark, filePath, outputPath)
 
     spark.stop()
   }
 
-  def run(spark: SparkSession): Unit = {
+  def run(spark: SparkSession, filePath: String, outputPath: String): Unit = {
     log.info("Reading data: ")
     log.info("Writing data: ")
-
-    import spark.implicits._
-    val df = spark.read
-        .text("/data/wordcount.txt")
-        .withColumn("word", explode(split(col("value"), " ")))
-        .select("word")
-        .groupBy("word")
-        .count()
-        .orderBy("word")
-//      .as[String] // As a data set
-////      .write
-////      .option("quoteAll", false)
-////      .option("quote", " ")
-////      .csv(outputPath)
-    df.show()
+    spark.read
+      .text(filePath)
+      .withColumn("word", explode(split(col("value"), " ")))
+      .select("word")
+      .groupBy("word")
+      .count()
+      .orderBy("word")
+      .coalesce(1)
+      .write
+      .mode(SaveMode.Overwrite)
+      .option("quoteAll", false)
+      .option("quote", " ")
+      .csv(outputPath)
+    //df.show()
     log.info("Application Done: " + spark.sparkContext.appName)
   }
 }
